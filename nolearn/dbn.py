@@ -5,7 +5,6 @@ from gdbn.dbn import buildDBN
 from gdbn import activationFunctions
 import numpy as np
 from sklearn.base import BaseEstimator
-from sklearn.preprocessing import LabelEncoder
 
 
 class DBN(BaseEstimator):
@@ -45,9 +44,6 @@ class DBN(BaseEstimator):
 
         pretrain_callback=None,
         fine_tune_callback=None,
-
-        random_state=None,
-
         verbose=0,
         ):
         """
@@ -175,9 +171,6 @@ class DBN(BaseEstimator):
                                    and the epoch, and is called for
                                    each epoch of fine tuning.
 
-        :param random_state: An optional int used as the seed by the
-                             random number generator.
-
         :param verbose: Debugging output.
         """
 
@@ -188,9 +181,6 @@ class DBN(BaseEstimator):
             output_act_funct = activationFunctions.Softmax()
         elif isinstance(output_act_funct, str):
             output_act_funct = getattr(activationFunctions, output_act_funct)()
-
-        if random_state is not None:
-            raise ValueError("random_sate must be an int")
 
         self.layer_sizes = layer_sizes
         self.scales = scales
@@ -224,7 +214,6 @@ class DBN(BaseEstimator):
 
         self.pretrain_callback = pretrain_callback
         self.fine_tune_callback = fine_tune_callback
-        self.random_state = random_state
         self.verbose = verbose
 
     def _fill_missing_layer_sizes(self, X, y):
@@ -245,10 +234,7 @@ class DBN(BaseEstimator):
 
         self._fill_missing_layer_sizes(X, y)
         if self.verbose:  # pragma: no cover
-            print "[DBN] layers {}".format(self.layer_sizes)
-
-        if self.random_state is not None:
-            np.random.seed(self.random_state)
+            print ("[DBN] layers {}".format(self.layer_sizes))
 
         net = buildDBN(
             self.layer_sizes,
@@ -344,13 +330,11 @@ class DBN(BaseEstimator):
                 self.net_.learnRates[index] = new_learn_rate
 
         if self.verbose >= 2:
-            print "Learn rates: {}".format(self.net_.learnRates)
+            print ("Learn rates: {}".format(self.net_.learnRates))
 
     def fit(self, X, y):
         if self.verbose:
-            print "[DBN] fitting X.shape=%s" % (X.shape,)
-        self._enc = LabelEncoder()
-        y = self._enc.fit_transform(y)
+            print ("[DBN] fitting X.shape=%s" % (X.shape,))
         y = self._onehot(y)
 
         self.net_ = self._build_net(X, y)
@@ -373,7 +357,7 @@ class DBN(BaseEstimator):
             for layer_index in range(len(self.layer_sizes) - 1):
                 errors_pretrain.append([])
                 if self.verbose:  # pragma: no cover
-                    print "[DBN] Pre-train layer {}...".format(layer_index + 1)
+                    print ("[DBN] Pre-train layer {}...".format(layer_index + 1))
                 time0 = time()
                 for epoch, err in enumerate(
                     self.net_.preTrainIth(
@@ -384,9 +368,9 @@ class DBN(BaseEstimator):
                         )):
                     errors_pretrain[-1].append(err)
                     if self.verbose:  # pragma: no cover
-                        print "  Epoch {}: err {}".format(epoch + 1, err)
+                        print ("  Epoch {}: err {}".format(epoch + 1, err))
                         elapsed = str(timedelta(seconds=time() - time0))
-                        print "  ({})".format(elapsed.split('.')[0])
+                        print ("  ({})".format(elapsed.split('.')[0]))
                         time0 = time()
                     if self.pretrain_callback is not None:
                         self.pretrain_callback(
@@ -394,7 +378,7 @@ class DBN(BaseEstimator):
 
         self._configure_net_finetune(self.net_)
         if self.verbose:  # pragma: no cover
-            print "[DBN] Fine-tune..."
+            print ("[DBN] Fine-tune...")
         time0 = time()
         for epoch, (loss, err) in enumerate(
             self.net_.fineTune(
@@ -409,18 +393,17 @@ class DBN(BaseEstimator):
             errors_fine_tune.append(err)
             self._learn_rate_adjust()
             if self.verbose:  # pragma: no cover
-                print "Epoch {}:".format(epoch + 1)
-                print "  loss {}".format(loss)
-                print "  err  {}".format(err)
+                print ("Epoch {}:".format(epoch + 1))
+                print ("  loss {}".format(loss))
+                print ("  err  {}".format(err))
                 elapsed = str(timedelta(seconds=time() - time0))
-                print "  ({})".format(elapsed.split('.')[0])
+                print ("  ({})".format(elapsed.split('.')[0]))
                 time0 = time()
             if self.fine_tune_callback is not None:
                 self.fine_tune_callback(self, epoch + 1)
 
     def predict(self, X):
-        y_ind = np.argmax(self.predict_proba(X), axis=1)
-        return self._enc.inverse_transform(y_ind)
+        return np.argmax(self.predict_proba(X), axis=1)
 
     def predict_proba(self, X):
         if hasattr(X, 'todense'):
@@ -448,6 +431,3 @@ class DBN(BaseEstimator):
         mistakes = loss_funct(outputs, targets)
         return - float(mistakes) / len(y) + 1
 
-    @property
-    def classes_(self):
-        return self._enc.classes_
